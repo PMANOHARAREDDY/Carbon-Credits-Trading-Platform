@@ -5,12 +5,21 @@ from flask_cors import CORS
 from google_auth_oauthlib.flow import Flow
 import requests
 from datetime import datetime
+from flask_caching import Cache
 
 BOARD_EMAIL = "manoharareddyp97@gmail.com"
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24)
+
+# --- Redis Cache Configuration ---
+app.config['CACHE_TYPE'] = 'RedisCache'
+app.config['CACHE_REDIS_HOST'] = 'localhost'
+app.config['CACHE_REDIS_PORT'] = 6379
+app.config['CACHE_REDIS_DB'] = 0
+app.config['CACHE_DEFAULT_TIMEOUT'] = 60  # 60 seconds default
+cache = Cache(app)
 
 with open("client_secret.json") as f:
     oauth_config = json.load(f)
@@ -30,6 +39,18 @@ def find_credit(credit_id):
         if credit["credit_id"] == credit_id:
             return credit
     return None
+
+def invalidate_all_caches():
+    cache.delete('all_projects')
+    cache.delete('all_credits')
+    cache.delete('projectwise_credits')
+    cache.delete('creditwise_history')
+    cache.delete('beckn_search')
+    # Invalidate user-specific caches if needed (example for 10 users)
+    for credit in app.config['CREDITS']:
+        cache.delete(f"user_credits_{credit['owner_email']}")
+    for user in set([p['owner_email'] for p in app.config['PROJECTS']]):
+        cache.delete(f"user_projects_{user}")
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -52,6 +73,7 @@ def register():
         "longitude": longitude
     }
     app.config['PROJECTS'].append(project)
+    invalidate_all_caches()
     return jsonify({"status": "success", "project_id": project_id})
 
 @app.route('/verify', methods=['POST'])
@@ -65,11 +87,19 @@ def verify():
     if not project:
         return jsonify({"status": "error", "message": "Project not found"}), 404
     project["status"] = "verified"
+    invalidate_all_caches()
     return jsonify({"status": "verified", "project_id": project_id})
 
 @app.route('/projects', methods=['GET'])
+@cache.cached(key_prefix='all_projects')
 def get_all_projects():
     return jsonify(app.config['PROJECTS'])
+
+@app.route('/projects/user', methods=['GET'])
+@cache.cached(timeout=60, key_prefix=lambda: f"user_projects_{request.args.get('user_email')}")
+def get_user_projects():
+    user_email = request.args.get("user_email")
+    return jsonify([p for p in app.config['PROJECTS'] if p["owner_email"] == user_email])
 
 @app.route('/issue_credit', methods=['POST'])
 def issue():
@@ -104,9 +134,11 @@ def issue():
         ]
     }
     app.config['CREDITS'].append(credit)
+    invalidate_all_caches()
     return jsonify({"status": "issued", "credit": credit})
 
 @app.route('/list_credits', methods=['GET'])
+@cache.cached(timeout=30, key_prefix='all_credits')
 def list_all():
     user_email = request.args.get("user_email")
     is_board = user_email == BOARD_EMAIL
@@ -115,6 +147,12 @@ def list_all():
     if user_email:
         return jsonify([c for c in app.config['CREDITS'] if c["owner_email"] == user_email])
     return jsonify([c for c in app.config['CREDITS'] if c["for_sale"] and not c["blocked"] and c["status"] == "verified"])
+
+@app.route('/credits/user', methods=['GET'])
+@cache.cached(timeout=30, key_prefix=lambda: f"user_credits_{request.args.get('user_email')}")
+def user_credits():
+    user_email = request.args.get("user_email")
+    return jsonify([c for c in app.config['CREDITS'] if c["owner_email"] == user_email])
 
 @app.route('/set_for_sale', methods=['POST'])
 def set_for_sale():
@@ -136,6 +174,7 @@ def set_for_sale():
         "by": user_email,
         "timestamp": datetime.now().isoformat()
     })
+    invalidate_all_caches()
     return jsonify({"status": "success", "credit": credit})
 
 @app.route('/remove_from_sale', methods=['POST'])
@@ -154,6 +193,7 @@ def remove_from_sale():
         "by": user_email,
         "timestamp": datetime.now().isoformat()
     })
+    invalidate_all_caches()
     return jsonify({"status": "success", "credit": credit})
 
 @app.route('/verify_credit', methods=['POST'])
@@ -172,6 +212,7 @@ def verify_credit():
         "by": verifier_email,
         "timestamp": datetime.now().isoformat()
     })
+    invalidate_all_caches()
     return jsonify({"status": "verified", "credit_id": credit_id})
 
 @app.route('/purchase_credit', methods=['POST'])
@@ -202,6 +243,7 @@ def purchase_credit():
         "by": buyer_email,
         "timestamp": datetime.now().isoformat()
     })
+    invalidate_all_caches()
     return jsonify({"status": "success", "credit": credit})
 
 @app.route('/block_credit', methods=['POST'])
@@ -221,6 +263,7 @@ def block_credit():
         "by": board_email,
         "timestamp": datetime.now().isoformat()
     })
+    invalidate_all_caches()
     return jsonify({"status": "blocked", "credit": credit})
 
 @app.route('/release_credit', methods=['POST'])
@@ -239,9 +282,11 @@ def release_credit():
         "by": board_email,
         "timestamp": datetime.now().isoformat()
     })
+    invalidate_all_caches()
     return jsonify({"status": "released", "credit": credit})
 
 @app.route('/board/projectwise_credits', methods=['GET'])
+@cache.cached(key_prefix='projectwise_credits')
 def board_projectwise_credits():
     projectwise = []
     for project in app.config['PROJECTS']:
@@ -255,6 +300,7 @@ def board_projectwise_credits():
     return jsonify(projectwise)
 
 @app.route('/board/creditwise_history', methods=['GET'])
+@cache.cached(key_prefix='creditwise_history')
 def board_creditwise_history():
     return jsonify(app.config['CREDITS'])
 
@@ -310,6 +356,7 @@ def credit_to_beckn_item(credit):
     }
 
 @beckn_api.route('/beckn/search', methods=['POST'])
+@cache.cached(timeout=30, key_prefix='beckn_search')
 def beckn_search():
     credits = current_app.config['CREDITS']
     available_credits = [c for c in credits if c['status'] == 'verified' and not c['blocked'] and c['for_sale']]
@@ -348,9 +395,11 @@ def beckn_confirm():
     credit['owner_email'] = buyer
     credit['for_sale'] = False
     credit['history'].append({"owner": buyer, "action": "beckn_transfer", "timestamp": datetime.now().isoformat()})
+    invalidate_all_caches()
     return jsonify({"message": "Transaction confirmed", "item": credit_to_beckn_item(credit)})
 
 @beckn_api.route('/beckn/status', methods=['POST'])
+@cache.cached(timeout=30, key_prefix=lambda: f"beckn_status_{request.json.get('item', {}).get('id')}")
 def beckn_status():
     data = request.json
     credit_id = data.get("item", {}).get("id")
