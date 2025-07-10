@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, redirect, session, request, jsonify
+from flask import Flask, redirect, session, request, jsonify, Blueprint, current_app
 from flask_cors import CORS
 from google_auth_oauthlib.flow import Flow
 import requests
@@ -15,17 +15,18 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24)
 with open("client_secret.json") as f:
     oauth_config = json.load(f)
 
-projects = []
-credits = []
+# In-memory data structures
+app.config['PROJECTS'] = []
+app.config['CREDITS'] = []
 
 def find_project(project_id):
-    for project in projects:
+    for project in app.config['PROJECTS']:
         if project["project_id"] == project_id:
             return project
     return None
 
 def find_credit(credit_id):
-    for credit in credits:
+    for credit in app.config['CREDITS']:
         if credit["credit_id"] == credit_id:
             return credit
     return None
@@ -50,7 +51,7 @@ def register():
         "latitude": latitude,
         "longitude": longitude
     }
-    projects.append(project)
+    app.config['PROJECTS'].append(project)
     return jsonify({"status": "success", "project_id": project_id})
 
 @app.route('/verify', methods=['POST'])
@@ -68,7 +69,7 @@ def verify():
 
 @app.route('/projects', methods=['GET'])
 def get_all_projects():
-    return jsonify(projects)
+    return jsonify(app.config['PROJECTS'])
 
 @app.route('/issue_credit', methods=['POST'])
 def issue():
@@ -86,7 +87,7 @@ def issue():
     if project["status"] != "verified":
         return jsonify({"status": "error", "message": "Project not verified. Cannot issue credits."}), 400
     credit = {
-        "credit_id": f"cc{len(credits)+1}",
+        "credit_id": f"cc{len(app.config['CREDITS'])+1}",
         "project_id": project_id,
         "amount": amount,
         "issuer_email": owner_email,
@@ -102,7 +103,7 @@ def issue():
             }
         ]
     }
-    credits.append(credit)
+    app.config['CREDITS'].append(credit)
     return jsonify({"status": "issued", "credit": credit})
 
 @app.route('/list_credits', methods=['GET'])
@@ -110,13 +111,10 @@ def list_all():
     user_email = request.args.get("user_email")
     is_board = user_email == BOARD_EMAIL
     if is_board:
-        # Show all credits including blocked ones to board
-        return jsonify(credits)
+        return jsonify(app.config['CREDITS'])
     if user_email:
-        # Return all credits owned by the user, including blocked status info
-        return jsonify([c for c in credits if c["owner_email"] == user_email])
-    # For others, only credits that are for sale, not blocked, and verified
-    return jsonify([c for c in credits if c["for_sale"] and not c["blocked"] and c["status"] == "verified"])
+        return jsonify([c for c in app.config['CREDITS'] if c["owner_email"] == user_email])
+    return jsonify([c for c in app.config['CREDITS'] if c["for_sale"] and not c["blocked"] and c["status"] == "verified"])
 
 @app.route('/set_for_sale', methods=['POST'])
 def set_for_sale():
@@ -246,8 +244,8 @@ def release_credit():
 @app.route('/board/projectwise_credits', methods=['GET'])
 def board_projectwise_credits():
     projectwise = []
-    for project in projects:
-        project_credits = [c for c in credits if c["project_id"] == project["project_id"]]
+    for project in app.config['PROJECTS']:
+        project_credits = [c for c in app.config['CREDITS'] if c["project_id"] == project["project_id"]]
         project_dict = dict(project)
         credits_list = [dict(c) for c in project_credits]
         projectwise.append({
@@ -258,7 +256,7 @@ def board_projectwise_credits():
 
 @app.route('/board/creditwise_history', methods=['GET'])
 def board_creditwise_history():
-    return jsonify(credits)
+    return jsonify(app.config['CREDITS'])
 
 @app.route("/login")
 def login():
@@ -283,7 +281,6 @@ def oauth2callback():
     flow.fetch_token(authorization_response=request.url)
     credentials = flow.credentials
     session["google_token"] = credentials.token
-
     userinfo_response = requests.get(
         "https://www.googleapis.com/oauth2/v3/userinfo",
         headers={"Authorization": f"Bearer {credentials.token}"}
@@ -296,6 +293,74 @@ def oauth2callback():
 def logout():
     session.clear()
     return redirect("http://localhost:3000")
+
+# --- Beckn Protocol Integration ---
+
+beckn_api = Blueprint('beckn_api', __name__)
+
+def credit_to_beckn_item(credit):
+    return {
+        "id": credit["credit_id"],
+        "descriptor": {"name": f"Credit {credit['credit_id']}"},
+        "tags": [
+            {"code": "project_id", "value": credit["project_id"]},
+            {"code": "owner", "value": credit["owner_email"]},
+            {"code": "status", "value": credit["status"]},
+        ]
+    }
+
+@beckn_api.route('/beckn/search', methods=['POST'])
+def beckn_search():
+    credits = current_app.config['CREDITS']
+    available_credits = [c for c in credits if c['status'] == 'verified' and not c['blocked'] and c['for_sale']]
+    items = [credit_to_beckn_item(c) for c in available_credits]
+    return jsonify({"message": "Beckn search", "items": items})
+
+@beckn_api.route('/beckn/select', methods=['POST'])
+def beckn_select():
+    data = request.json
+    credit_id = data.get("item", {}).get("id")
+    credits = current_app.config['CREDITS']
+    credit = next((c for c in credits if c['credit_id'] == credit_id), None)
+    if not credit or credit['status'] != 'verified' or credit['blocked'] or not credit['for_sale']:
+        return jsonify({"error": "Credit not available"}), 404
+    return jsonify({"message": "Credit selected", "item": credit_to_beckn_item(credit)})
+
+@beckn_api.route('/beckn/init', methods=['POST'])
+def beckn_init():
+    data = request.json
+    credit_id = data.get("item", {}).get("id")
+    credits = current_app.config['CREDITS']
+    credit = next((c for c in credits if c['credit_id'] == credit_id), None)
+    if not credit or credit['status'] != 'verified' or credit['blocked'] or not credit['for_sale']:
+        return jsonify({"error": "Credit not available"}), 404
+    return jsonify({"message": "Transaction initialized", "item": credit_to_beckn_item(credit)})
+
+@beckn_api.route('/beckn/confirm', methods=['POST'])
+def beckn_confirm():
+    data = request.json
+    credit_id = data.get("item", {}).get("id")
+    buyer = data.get("buyer", {}).get("id")
+    credits = current_app.config['CREDITS']
+    credit = next((c for c in credits if c['credit_id'] == credit_id), None)
+    if not credit or credit['status'] != 'verified' or credit['blocked'] or not credit['for_sale']:
+        return jsonify({"error": "Credit not available"}), 404
+    credit['owner_email'] = buyer
+    credit['for_sale'] = False
+    credit['history'].append({"owner": buyer, "action": "beckn_transfer", "timestamp": datetime.now().isoformat()})
+    return jsonify({"message": "Transaction confirmed", "item": credit_to_beckn_item(credit)})
+
+@beckn_api.route('/beckn/status', methods=['POST'])
+def beckn_status():
+    data = request.json
+    credit_id = data.get("item", {}).get("id")
+    credits = current_app.config['CREDITS']
+    credit = next((c for c in credits if c['credit_id'] == credit_id), None)
+    if not credit:
+        return jsonify({"error": "Credit not found"}), 404
+    return jsonify({"item": credit_to_beckn_item(credit), "history": credit.get("history", [])})
+
+app.register_blueprint(beckn_api)
 
 if __name__ == '__main__':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
