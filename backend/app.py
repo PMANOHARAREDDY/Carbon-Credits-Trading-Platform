@@ -195,7 +195,21 @@ def list_all():
     if is_board:
         return jsonify(app.config['CREDITS'])
     if user_email:
-        return jsonify([c for c in app.config['CREDITS'] if c["owner_email"] == user_email])
+        # Determine if this is a user credits fetch or market credits fetch
+        # If query param 'market' is set to true, treat as market credits fetch
+        market = request.args.get("market", "false").lower() == "true"
+        if market:
+            # Return credits that are either for sale or not owned by the user and not for sale, all verified and not blocked
+            return jsonify([
+                c for c in app.config['CREDITS']
+                if c["status"] == "verified" and not c["blocked"] and (
+                    c["for_sale"] or (c["owner_email"] != user_email and not c["for_sale"])
+                )
+            ])
+        else:
+            # Return credits owned by the user
+            return jsonify([c for c in app.config['CREDITS'] if c["owner_email"] == user_email])
+    # No user_email provided, fallback to current behavior
     return jsonify([c for c in app.config['CREDITS'] if c["for_sale"] and not c["blocked"] and c["status"] == "verified"])
 
 @app.route('/credits/user', methods=['GET'])

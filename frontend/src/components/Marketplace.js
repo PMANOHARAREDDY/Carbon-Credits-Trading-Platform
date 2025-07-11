@@ -11,7 +11,7 @@ function Marketplace({ userEmail, refresh }) {
   };
 
   const fetchMarketCredits = () => {
-    fetch('http://localhost:5000/list_credits')
+    fetch('http://localhost:5000/list_credits?user_email=' + userEmail + '&market=true')
       .then(res => res.json())
       .then(data => setMarketCredits(data));
   };
