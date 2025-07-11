@@ -6,6 +6,7 @@ from google_auth_oauthlib.flow import Flow
 import requests
 from datetime import datetime
 from flask_caching import Cache
+import mysql.connector
 
 BOARD_EMAIL = "manoharareddyp97@gmail.com"
 
@@ -28,6 +29,14 @@ with open("client_secret.json") as f:
 app.config['PROJECTS'] = []
 app.config['CREDITS'] = []
 
+def get_db_connection():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="Pavitra@01",
+        database="carboncredits"
+    )
+
 def find_project(project_id):
     for project in app.config['PROJECTS']:
         if project["project_id"] == project_id:
@@ -46,7 +55,6 @@ def invalidate_all_caches():
     cache.delete('projectwise_credits')
     cache.delete('creditwise_history')
     cache.delete('beckn_search')
-    # Invalidate user-specific caches if needed (example for 10 users)
     for credit in app.config['CREDITS']:
         cache.delete(f"user_credits_{credit['owner_email']}")
     for user in set([p['owner_email'] for p in app.config['PROJECTS']]):
@@ -73,6 +81,20 @@ def register():
         "longitude": longitude
     }
     app.config['PROJECTS'].append(project)
+    # Store in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        sql = """
+            INSERT INTO projects (project_id, name, status, owner_email, latitude, longitude)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql, (project_id, name, "registered", user_email, latitude, longitude))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "success", "project_id": project_id})
 
@@ -87,6 +109,17 @@ def verify():
     if not project:
         return jsonify({"status": "error", "message": "Project not found"}), 404
     project["status"] = "verified"
+    # Store update in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        sql = "UPDATE projects SET status = %s WHERE project_id = %s"
+        cursor.execute(sql, ("verified", project_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "verified", "project_id": project_id})
 
@@ -134,6 +167,23 @@ def issue():
         ]
     }
     app.config['CREDITS'].append(credit)
+    # Store in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        sql = """
+            INSERT INTO credits (credit_id, project_id, amount, issuer_email, owner_email, status, for_sale, blocked)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(sql, (
+            credit["credit_id"], credit["project_id"], credit["amount"], credit["issuer_email"],
+            credit["owner_email"], credit["status"], credit["for_sale"], credit["blocked"]
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "issued", "credit": credit})
 
@@ -174,6 +224,17 @@ def set_for_sale():
         "by": user_email,
         "timestamp": datetime.now().isoformat()
     })
+    # Store update in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        sql = "UPDATE credits SET for_sale = TRUE WHERE credit_id = %s"
+        cursor.execute(sql, (credit_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "success", "credit": credit})
 
@@ -193,6 +254,17 @@ def remove_from_sale():
         "by": user_email,
         "timestamp": datetime.now().isoformat()
     })
+    # Store update in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        sql = "UPDATE credits SET for_sale = FALSE WHERE credit_id = %s"
+        cursor.execute(sql, (credit_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "success", "credit": credit})
 
@@ -212,6 +284,17 @@ def verify_credit():
         "by": verifier_email,
         "timestamp": datetime.now().isoformat()
     })
+    # Store update in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        sql = "UPDATE credits SET status = %s WHERE credit_id = %s"
+        cursor.execute(sql, ("verified", credit_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "verified", "credit_id": credit_id})
 
@@ -243,6 +326,24 @@ def purchase_credit():
         "by": buyer_email,
         "timestamp": datetime.now().isoformat()
     })
+    # Store update in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        update_sql = """
+            UPDATE credits SET owner_email=%s, for_sale=FALSE WHERE credit_id=%s
+        """
+        cursor.execute(update_sql, (buyer_email, credit_id))
+        history_sql = """
+            INSERT INTO credit_history (credit_id, action, by_email, timestamp)
+            VALUES (%s, %s, %s, NOW())
+        """
+        cursor.execute(history_sql, (credit_id, 'purchased', buyer_email))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "success", "credit": credit})
 
@@ -263,6 +364,17 @@ def block_credit():
         "by": board_email,
         "timestamp": datetime.now().isoformat()
     })
+    # Store update in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        sql = "UPDATE credits SET blocked = TRUE, for_sale = FALSE WHERE credit_id = %s"
+        cursor.execute(sql, (credit_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "blocked", "credit": credit})
 
@@ -282,6 +394,17 @@ def release_credit():
         "by": board_email,
         "timestamp": datetime.now().isoformat()
     })
+    # Store update in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        sql = "UPDATE credits SET blocked = FALSE WHERE credit_id = %s"
+        cursor.execute(sql, (credit_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"status": "released", "credit": credit})
 
@@ -395,6 +518,24 @@ def beckn_confirm():
     credit['owner_email'] = buyer
     credit['for_sale'] = False
     credit['history'].append({"owner": buyer, "action": "beckn_transfer", "timestamp": datetime.now().isoformat()})
+    # Store update in DB for backup
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        update_sql = """
+            UPDATE credits SET owner_email=%s, for_sale=FALSE WHERE credit_id=%s
+        """
+        cursor.execute(update_sql, (buyer, credit_id))
+        history_sql = """
+            INSERT INTO credit_history (credit_id, action, by_email, timestamp)
+            VALUES (%s, %s, %s, NOW())
+        """
+        cursor.execute(history_sql, (credit_id, 'beckn_transfer', buyer))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB backup error: {e}")
     invalidate_all_caches()
     return jsonify({"message": "Transaction confirmed", "item": credit_to_beckn_item(credit)})
 
