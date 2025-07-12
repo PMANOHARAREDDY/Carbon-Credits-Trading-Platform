@@ -135,7 +135,7 @@ function Onboarding({ userEmail, setRefresh, refresh }) {
   return (
     <div className="section">
       <form onSubmit={handleRegister}>
-        <h2>Register Project</h2>
+        <h2>Project Registration</h2>
         <input name="projectName" placeholder="Project Name" required />
         <div
           ref={mapRef}

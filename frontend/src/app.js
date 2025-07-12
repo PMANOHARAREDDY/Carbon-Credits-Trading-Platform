@@ -19,9 +19,16 @@ function App() {
 
   if (!user) {
     return (
-      <div>
-        <h1>Carbon Credit Platform</h1>
+      <div className="signin-container">
+        <h1>Welcome</h1>
+        <h2>Carbon Trading Platform</h2>
         <GoogleLoginButton />
+        <div className="bubble"></div>
+        <div className="bubble"></div>
+        <div className="bubble"></div>
+        <div className="bubble"></div>
+        <div className="bubble"></div>
+        <div className="bubble"></div>
       </div>
     );
   }
@@ -29,7 +36,8 @@ function App() {
   if (user === BOARD_EMAIL) {
     return (
       <div>
-        <h1>Welcome, Board ({user})</h1>
+        <h1>Welcome Board, </h1>
+        <h2>{user}</h2>
         <BoardVerify userEmail={user} setRefresh={setRefresh} refresh={refresh} />
         <a href="http://localhost:5000/logout">Logout</a>
       </div>
@@ -38,7 +46,7 @@ function App() {
 
   return (
     <div>
-      <h1>Welcome, {user}</h1>
+      <h1>User : {user}</h1>
       <Onboarding userEmail={user} setRefresh={setRefresh} refresh={refresh} />
       <Dashboard userEmail={user} refresh={refresh} />
       <Marketplace userEmail={user} refresh={refresh} />
