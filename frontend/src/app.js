@@ -20,9 +20,8 @@ function App() {
   if (!user) {
     return (
       <div className="signin-container">
-        <img src="/logo.png" alt="Carbon Trading Logo" className="signin-logo" />
         <h1>Welcome</h1>
-        <div className="signin-tagline">Empowering Carbon Trading for a Sustainable Future</div>
+        <div className="signin-tagline">"Trading for a better tomorrow"</div>
         <h2>Carbon Trading Platform</h2>
         <GoogleLoginButton />
         <div className="bubble"></div>
