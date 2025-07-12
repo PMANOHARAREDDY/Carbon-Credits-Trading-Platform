@@ -83,37 +83,35 @@ function Marketplace({ userEmail, refresh }) {
     <div className="section">
       <h2>Credits on Market</h2>
       <button onClick={() => { fetchOwnedCredits(); fetchMarketCredits(); }}>Refresh</button>
-      <ul>
-        {ownedCredits.map(credit => (
-          <li key={credit.credit_id} className="credit-info">
-            Credit ID: {credit.credit_id}, Project ID: {credit.project_id}, Amount: {credit.amount}, Issuer: {credit.issuer_email}, Owner: {credit.owner_email}, Status: {credit.status}
-            {!credit.for_sale && (
-              <button onClick={() => handleSetForSale(credit)} className="button-margin-left">
-                Put for Sale
-              </button>
-            )}
-            {credit.for_sale && (
-              <button onClick={() => handleRemoveFromSale(credit)} className="button-margin-left">
-                Remove from Sale
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      {ownedCredits.length === 0 && <p>No owned credits found.</p>}
+      {ownedCredits.map(credit => (
+        <div key={credit.credit_id} className="card credit-info">
+          <p>Credit ID: {credit.credit_id}, Project ID: {credit.project_id}, Amount: {credit.amount}, Issuer: {credit.issuer_email}, Owner: {credit.owner_email}, Status: {credit.status}</p>
+          {!credit.for_sale && (
+            <button onClick={() => handleSetForSale(credit)} className="button-margin-left">
+              Put for Sale
+            </button>
+          )}
+          {credit.for_sale && (
+            <button onClick={() => handleRemoveFromSale(credit)} className="button-margin-left">
+              Remove from Sale
+            </button>
+          )}
+        </div>
+      ))}
 
       <h2>Credits for Sale</h2>
-      <ul>
-        {marketCredits.map(credit => (
-          <li key={credit.credit_id} className="credit-info">
-            Credit ID: {credit.credit_id}, Project ID: {credit.project_id}, Amount: {credit.amount}, Issuer: {credit.issuer_email}, Owner: {credit.owner_email}, Status: {credit.status}
-            {credit.owner_email !== userEmail && (
-              <button onClick={() => handleBuy(credit)} className="button-margin-left">
-                Buy
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      {marketCredits.length === 0 && <p>No credits for sale found.</p>}
+      {marketCredits.map(credit => (
+        <div key={credit.credit_id} className="card credit-info">
+          <p>Credit ID: {credit.credit_id}, Project ID: {credit.project_id}, Amount: {credit.amount}, Issuer: {credit.issuer_email}, Owner: {credit.owner_email}, Status: {credit.status}</p>
+          {credit.owner_email !== userEmail && (
+            <button onClick={() => handleBuy(credit)} className="button-margin-left">
+              Buy
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

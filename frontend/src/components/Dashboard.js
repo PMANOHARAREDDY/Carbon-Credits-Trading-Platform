@@ -37,27 +37,23 @@ function Dashboard({ userEmail, refresh }) {
   return (
     <div className="section">
       <h2>Your Credits (Issued, Owned, or Sold)</h2>
-      <ul>
-        {credits.length === 0 && <li>No credits issued or owned yet.</li>}
-        {credits.map(credit => {
-          const project = getProject(credit.project_id);
-          return (
-            <li key={credit.credit_id} className="credit-info">
-              <strong>Credit:</strong> ID: {credit.credit_id}, Amount: {credit.amount}, Status: {credit.status}, For Sale: {credit.for_sale ? 'Yes' : 'No'}
-              <br />
-              <strong>Project:</strong> {project ? `${project.name} (ID: ${project.project_id}) - Owner: ${project.owner_email} - Status: ${project.status}` : 'Project details not found'}
-              <br />
-              {isCurrentOwner(credit) ? (
-                <span className="status-green">You currently own this credit.</span>
-              ) : (
-                <span className="status-blue">
-                  Sold to {getBuyer(credit)}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {credits.length === 0 && <p>No credits issued or owned yet.</p>}
+      {credits.map(credit => {
+        const project = getProject(credit.project_id);
+        return (
+          <div key={credit.credit_id} className="card credit-info">
+            <p><strong>Credit:</strong> ID: {credit.credit_id}, Amount: {credit.amount}, Status: {credit.status}, For Sale: {credit.for_sale ? 'Yes' : 'No'}</p>
+            <p><strong>Project:</strong> {project ? `${project.name} (ID: ${project.project_id}) - Owner: ${project.owner_email} - Status: ${project.status}` : 'Project details not found'}</p>
+            {isCurrentOwner(credit) ? (
+              <p className="status-green">You currently own this credit.</p>
+            ) : (
+              <p className="status-blue">
+                Sold to {getBuyer(credit)}
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

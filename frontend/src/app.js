@@ -35,22 +35,22 @@ function App() {
 
   if (user === BOARD_EMAIL) {
     return (
-      <div>
+      <div className="app-container">
         <h1>Welcome Board, </h1>
         <h2>{user}</h2>
         <BoardVerify userEmail={user} setRefresh={setRefresh} refresh={refresh} />
-        <a href="http://localhost:5000/logout">Logout</a>
+        <a href="http://localhost:5000/logout" className="logout-link">Logout</a>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="app-container">
       <h1>User : {user}</h1>
       <Onboarding userEmail={user} setRefresh={setRefresh} refresh={refresh} />
       <Dashboard userEmail={user} refresh={refresh} />
       <Marketplace userEmail={user} refresh={refresh} />
-      <a href="http://localhost:5000/logout">Logout</a>
+      <a href="http://localhost:5000/logout" className="logout-link">Logout</a>
     </div>
   );
 }
