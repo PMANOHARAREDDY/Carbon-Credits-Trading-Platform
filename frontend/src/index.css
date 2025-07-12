@@ -161,6 +161,38 @@ form {
   background: url('https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1470&q=80') no-repeat center center fixed;
   background-size: cover;
   overflow: hidden;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6) inset;
+  border-radius: 20px;
+  padding: 40px 20px;
+  max-width: 480px;
+  margin: 20px;
+}
+
+.signin-tagline {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: #d0e8ff;
+  margin-bottom: 30px;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(0, 119, 255, 0.7);
+  animation: fadeIn 2.5s ease forwards;
+}
+
+.signin-container .bubble {
+  position: absolute;
+  bottom: -100px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  opacity: 0.95;
+  animation: floatUp 12s linear infinite;
+  filter: blur(1.8px);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+  transition: transform 0.3s ease;
+}
+
+.signin-container .bubble:hover {
+  transform: scale(1.2) translateY(-10px);
+  animation-play-state: paused;
 }
 
 .signin-container::after {
@@ -211,6 +243,112 @@ form {
   font-weight: 900;
   margin: 0 0 10px 0;
   text-shadow: 2px 2px 12px rgba(0, 0, 0, 0.9);
+  animation: slideInDown 1s ease forwards;
+}
+
+.signin-container h2 {
+  font-size: 3rem;
+  font-weight: 700;
+  margin: 0 0 40px 0;
+  text-shadow: 1.5px 1.5px 8px rgba(0, 0, 0, 0.8);
+  animation: slideInUp 1s ease forwards;
+}
+
+.signin-logo {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 20px;
+  animation: fadeIn 2s ease forwards;
+}
+
+@keyframes slideInDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.signin-container .bubble {
+  position: absolute;
+  bottom: -100px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  opacity: 0.9;
+  animation: floatUp 10s linear infinite;
+  filter: blur(1.5px);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+}
+
+.signin-container .bubble:nth-child(1) {
+  width: 60px;
+  height: 60px;
+  left: 10%;
+  animation-duration: 14s;
+  animation-delay: 0s;
+}
+
+.signin-container .bubble:nth-child(2) {
+  width: 35px;
+  height: 35px;
+  left: 25%;
+  animation-duration: 12s;
+  animation-delay: 2s;
+}
+
+.signin-container .bubble:nth-child(3) {
+  width: 45px;
+  height: 45px;
+  left: 40%;
+  animation-duration: 16s;
+  animation-delay: 4s;
+}
+
+.signin-container .bubble:nth-child(4) {
+  width: 30px;
+  height: 30px;
+  left: 60%;
+  animation-duration: 13s;
+  animation-delay: 1s;
+}
+
+.signin-container .bubble:nth-child(5) {
+  width: 55px;
+  height: 55px;
+  left: 75%;
+  animation-duration: 15s;
+  animation-delay: 3s;
+}
+
+.signin-container .bubble:nth-child(6) {
+  width: 25px;
+  height: 25px;
+  left: 85%;
+  animation-duration: 11s;
+  animation-delay: 5s;
 }
 
 .signin-container h2 {
