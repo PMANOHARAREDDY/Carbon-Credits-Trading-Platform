@@ -81,7 +81,7 @@ function Marketplace({ userEmail, refresh }) {
 
   return (
     <div className="section">
-      <h2>Your Credits</h2>
+      <h2>Credits on Market</h2>
       <button onClick={() => { fetchOwnedCredits(); fetchMarketCredits(); }}>Refresh</button>
       <ul>
         {ownedCredits.map(credit => (

@@ -14,12 +14,12 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or os.urandom(24)
 
-# --- Redis Cache Configuration ---
+# Redis Cache Configuration
 app.config['CACHE_TYPE'] = 'RedisCache'
 app.config['CACHE_REDIS_HOST'] = 'localhost'
 app.config['CACHE_REDIS_PORT'] = 6379
 app.config['CACHE_REDIS_DB'] = 0
-app.config['CACHE_DEFAULT_TIMEOUT'] = 60  # 60 seconds default
+app.config['CACHE_DEFAULT_TIMEOUT'] = 60  
 cache = Cache(app)
 
 with open("client_secret.json") as f:
@@ -81,7 +81,6 @@ def register():
         "longitude": longitude
     }
     app.config['PROJECTS'].append(project)
-    # Store in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -109,7 +108,6 @@ def verify():
     if not project:
         return jsonify({"status": "error", "message": "Project not found"}), 404
     project["status"] = "verified"
-    # Store update in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -167,7 +165,6 @@ def issue():
         ]
     }
     app.config['CREDITS'].append(credit)
-    # Store in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -195,11 +192,8 @@ def list_all():
     if is_board:
         return jsonify(app.config['CREDITS'])
     if user_email:
-        # Determine if this is a user credits fetch or market credits fetch
-        # If query param 'market' is set to true, treat as market credits fetch
         market = request.args.get("market", "false").lower() == "true"
         if market:
-            # Return credits that are either for sale or not owned by the user and not for sale, all verified and not blocked
             return jsonify([
                 c for c in app.config['CREDITS']
                 if c["status"] == "verified" and not c["blocked"] and (
@@ -207,9 +201,7 @@ def list_all():
                 )
             ])
         else:
-            # Return credits owned by the user
             return jsonify([c for c in app.config['CREDITS'] if c["owner_email"] == user_email])
-    # No user_email provided, fallback to current behavior
     return jsonify([c for c in app.config['CREDITS'] if c["for_sale"] and not c["blocked"] and c["status"] == "verified"])
 
 @app.route('/credits/user', methods=['GET'])
@@ -238,7 +230,6 @@ def set_for_sale():
         "by": user_email,
         "timestamp": datetime.now().isoformat()
     })
-    # Store update in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -268,7 +259,6 @@ def remove_from_sale():
         "by": user_email,
         "timestamp": datetime.now().isoformat()
     })
-    # Store update in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -298,7 +288,6 @@ def verify_credit():
         "by": verifier_email,
         "timestamp": datetime.now().isoformat()
     })
-    # Store update in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -340,7 +329,6 @@ def purchase_credit():
         "by": buyer_email,
         "timestamp": datetime.now().isoformat()
     })
-    # Store update in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -378,7 +366,6 @@ def block_credit():
         "by": board_email,
         "timestamp": datetime.now().isoformat()
     })
-    # Store update in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -408,7 +395,6 @@ def release_credit():
         "by": board_email,
         "timestamp": datetime.now().isoformat()
     })
-    # Store update in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -477,7 +463,7 @@ def logout():
     session.clear()
     return redirect("http://localhost:3000")
 
-# --- Beckn Protocol Integration ---
+# Beckn Protocol Integration
 
 beckn_api = Blueprint('beckn_api', __name__)
 
@@ -532,7 +518,6 @@ def beckn_confirm():
     credit['owner_email'] = buyer
     credit['for_sale'] = False
     credit['history'].append({"owner": buyer, "action": "beckn_transfer", "timestamp": datetime.now().isoformat()})
-    # Store update in DB for backup
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
